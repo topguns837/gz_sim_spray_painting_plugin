@@ -3,14 +3,14 @@ ur_spray_demo.launch.py
 =======================
 Single entry-point for the UR5e spray painting demo:
 
-  * Gazebo Harmonic          — loads car_painting.sdf world
-  * ros_gz_bridge            — /clock (GZ→ROS) + /spray_paint/trigger (ROS→GZ)
-  * robot_state_publisher    — publishes TF from the spray URDF
-  * joint_state_publisher    — provides correct initial pose until JSB starts
-  * gz service create        — injects the robot at T+8 s
-  * controller spawners      — joint_state_broadcaster (T+20 s) +
+  * Gazebo Harmonic          :loads car_painting.sdf world
+  * ros_gz_bridge            :/clock (GZ→ROS) + /spray_paint/trigger (ROS→GZ)
+  * robot_state_publisher    :publishes TF from the spray URDF
+  * joint_state_publisher    :provides correct initial pose until JSB starts
+  * gz service create        :injects the robot at T+8 s
+  * controller spawners      :joint_state_broadcaster (T+20 s) +
                                joint_trajectory_controller (T+25 s)
-  * MoveIt 2                 — move_group + RViz
+  * MoveIt 2                 :move_group + RViz
 
 Usage:
   ros2 launch gz_spray_painting_plugin_demo ur_spray_demo.launch.py
@@ -286,7 +286,7 @@ def launch_setup(context, *args, **kwargs):
         moveit_actions = [move_group_node]  # rviz_node disabled
 
     except Exception as exc:
-        print(f"\n[ur_spray_demo] MoveIt failed to load — skipping.\n"
+        print(f"\n[ur_spray_demo] MoveIt failed to load, skipping.\n"
               f"  Error: {exc}\n{traceback.format_exc()}")
 
     return [
