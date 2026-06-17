@@ -6,21 +6,19 @@
 #   docker build -t spray_paint_plugin .
 #
 # Run (headless, trigger via gz topic):
-#   docker run --rm -it \
-#     -e GZ_SIM_SYSTEM_PLUGIN_PATH=/ws/install/gz_sim_spray_painting_plugin/lib/gz_sim_spray_painting_plugin \
-#     spray_paint_plugin \
-#     gz sim /ws/install/gz_sim_spray_painting_plugin/share/gz_sim_spray_painting_plugin/worlds/spray_painting.sdf -s
+#   docker run --rm -it spray_paint_plugin gz sim -s $SPRAY_WORLD
 #
 # Run with GUI (requires X11 forwarding on host: xhost +local:docker):
 #   docker run --rm -it \
 #     -e DISPLAY=$DISPLAY \
 #     -v /tmp/.X11-unix:/tmp/.X11-unix \
-#     -e GZ_SIM_SYSTEM_PLUGIN_PATH=/ws/install/gz_sim_spray_painting_plugin/lib/gz_sim_spray_painting_plugin \
-#     spray_paint_plugin \
-#     gz sim /ws/install/gz_sim_spray_painting_plugin/share/gz_sim_spray_painting_plugin/worlds/spray_painting.sdf
+#     spray_paint_plugin gz sim $SPRAY_WORLD
 # ─────────────────────────────────────────────────────────────────────────────
 
 FROM ubuntu:22.04
+
+# Disable apt release-date validity check (guards against host/container clock skew)
+RUN echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99ignore-release-date
 
 # ── Non-interactive apt ────────────────────────────────────────────────────────
 ENV DEBIAN_FRONTEND=noninteractive
@@ -89,6 +87,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-robot-state-publisher \
       ros-humble-ros-gz-sim \
       ros-humble-ros-gz-bridge \
+      ros-humble-xacro \
       python3-colcon-common-extensions \
       python3-rosdep \
     && rm -rf /var/lib/apt/lists/*
@@ -105,9 +104,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-moveit \
       ros-humble-ur-moveit-config \
     && rm -rf /var/lib/apt/lists/*
-
-# ── xacro (required to process .urdf.xacro files at launch time) ──────────────
-RUN pip3 install xacro
 
 # gz_spray_painting_plugin_demo and gz_ros2_control are cloned into src/ and built by the
 # main colcon step below (after COPY . .).
@@ -126,8 +122,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libgl1-mesa-glx \
       libgl1-mesa-dri \
       libgles2-mesa \
-      mesa-utils \
-      x11-apps \
       libx11-xcb1 \
       libxcb-icccm4 \
       libxcb-image0 \
@@ -146,14 +140,12 @@ COPY . .
 # ── Build with colcon ─────────────────────────────────────────────────────────
 # GZ_VERSION=harmonic is required so gz_ros2_control links against gz-sim8.
 RUN . /opt/ros/humble/setup.sh \
-    && GZ_VERSION=harmonic colcon build \
+    && GZ_VERSION=harmonic colcon build --symlink-install \
          --packages-select \
            gz_ros2_control \
            gz_spray_painting_plugin_demo \
            gz_sim_spray_painting_plugin \
-         --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    && rm -rf build/gz_ros2_control \
-              build/gz_spray_painting_plugin_demo build/gz_sim_spray_painting_plugin
+         --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo
 
 # ── Runtime environment ───────────────────────────────────────────────────────
 ENV GZ_SIM_SYSTEM_PLUGIN_PATH=/ws/install/gz_sim_spray_painting_plugin/lib/gz_sim_spray_painting_plugin:/ws/install/gz_ros2_control/lib
@@ -164,7 +156,7 @@ RUN echo ". /opt/ros/humble/setup.bash" >> /etc/bash.bashrc \
     && echo ". /ws/install/setup.bash 2>/dev/null || true" >> /etc/bash.bashrc
 
 # Convenience: world file path
-ENV SPRAY_WORLD=/ws/install/gz_sim_spray_painting_plugin/share/gz_sim_spray_painting_plugin/worlds/spray_painting.sdf
+ENV SPRAY_WORLD=/ws/install/gz_spray_painting_plugin_demo/share/gz_spray_painting_plugin_demo/worlds/spray_painting.sdf
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 # entrypoint.sh was already copied via COPY . . above (project root → /ws)

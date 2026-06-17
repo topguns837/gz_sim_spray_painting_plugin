@@ -30,10 +30,21 @@ print_menu() {
     echo ""
 }
 
-# ── Option 1: Start stack (delegates to run_scripts/run_stack.py) ─────────────
+# ── Option 1: Start stack ─────────────────────────────────────────────────────
 start_stack() {
+    local container="spray_paint_stack"
     echo -e "\n${GREEN}${BOLD}▶ Starting stack...${RESET}\n"
-    python3 "$SCRIPT_DIR/run_scripts/run_stack.py"
+
+    # Start container detached (all Docker mechanics in run_docker.sh)
+    bash "$SCRIPT_DIR/run_scripts/docker/run_docker.sh" \
+        "container_name=$container" detach
+
+    # Run tmux setup + attach inside the running container
+    docker exec -it "$container" python3 /ws/run_scripts/run_stack.py
+
+    # Clean up when the tmux session ends
+    docker stop "$container" 2>/dev/null || true
+    docker rm   "$container" 2>/dev/null || true
 }
 
 # ── Option 2: Code build (delegates to run_scripts/build_code.py) ─────────────
@@ -45,7 +56,7 @@ code_build() {
 # ── Option 4: Empty container ─────────────────────────────────────────────────
 empty_container() {
     echo -e "\n${BOLD}▶ Opening empty container...${RESET}\n"
-    bash "$SCRIPT_DIR/run_scripts/run_docker.sh" empty_container
+    bash "$SCRIPT_DIR/run_scripts/docker/run_docker.sh" empty_container
 }
 
 # ── Option 3: Docker build ─────────────────────────────────────────────────────

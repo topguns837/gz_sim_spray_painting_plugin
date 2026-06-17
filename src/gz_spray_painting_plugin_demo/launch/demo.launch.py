@@ -1,12 +1,15 @@
 """
-gz_sim.launch.py
-================
+demo.launch.py
+==============
 Standalone spray-painting demo: Gazebo + ros_gz_bridge + spray nozzle.
-No UR robot. Use this to verify the spray plugin in isolation.
+No UR robot. Use this to verify the spray plugin in isolation with any world.
 
 Usage:
-  ros2 launch gz_sim_spray_painting_plugin gz_sim.launch.py
-  ros2 launch gz_sim_spray_painting_plugin gz_sim.launch.py headless:=true
+  ros2 launch gz_spray_painting_plugin_demo demo.launch.py
+  ros2 launch gz_spray_painting_plugin_demo demo.launch.py world:=test_all_geometry
+  ros2 launch gz_spray_painting_plugin_demo demo.launch.py world:=test_complex_meshes
+  ros2 launch gz_spray_painting_plugin_demo demo.launch.py world:=test_cube
+  ros2 launch gz_spray_painting_plugin_demo demo.launch.py headless:=true
 """
 
 import os
@@ -16,31 +19,31 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
+    OpaqueFunction,
     SetEnvironmentVariable,
     TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import EnvironmentVariable, LaunchConfiguration
+from launch_ros.actions import Node
 
 
-def generate_launch_description():
-    pkg_share  = get_package_share_directory("gz_sim_spray_painting_plugin")
-    pkg_prefix = get_package_prefix("gz_sim_spray_painting_plugin")
-    ur_sim_models = os.path.join(
-        get_package_share_directory("gz_spray_painting_plugin_demo"), "models"
-    )
+def launch_setup(context, *args, **kwargs):
+    world_stem        = LaunchConfiguration("world").perform(context)
+    headless          = LaunchConfiguration("headless")
+    demo_pkg_share    = get_package_share_directory("gz_spray_painting_plugin_demo")
+    plugin_pkg_prefix = get_package_prefix("gz_sim_spray_painting_plugin")
 
-    world_path        = os.path.join(pkg_share, "worlds", "spray_painting.sdf")
-    bridge_config     = os.path.join(pkg_share, "config", "ros_gz_bridge.yaml")
-    nozzle_urdf       = os.path.join(pkg_share, "urdf", "spray_nozzle.urdf")
-
-    headless = LaunchConfiguration("headless")
+    world_path    = os.path.join(demo_pkg_share, "worlds", f"{world_stem}.sdf")
+    bridge_config = os.path.join(demo_pkg_share, "config", "ros_gz_bridge.yaml")
+    nozzle_urdf   = os.path.join(demo_pkg_share, "urdf", "spray_nozzle.urdf")
+    spawn_topic   = f"/world/{world_stem}/create"
 
     set_gz_version = SetEnvironmentVariable(name="GZ_VERSION", value="harmonic")
     set_plugin_path = SetEnvironmentVariable(
         name="GZ_SIM_SYSTEM_PLUGIN_PATH",
         value=[
-            os.path.join(pkg_prefix, "lib", "gz_sim_spray_painting_plugin"),
+            os.path.join(plugin_pkg_prefix, "lib", "gz_sim_spray_painting_plugin"),
             ":/ws/install/gz_ros2_control/lib:",
             EnvironmentVariable("GZ_SIM_SYSTEM_PLUGIN_PATH", default_value=""),
         ],
@@ -48,8 +51,7 @@ def generate_launch_description():
     set_resource_path = SetEnvironmentVariable(
         name="GZ_SIM_RESOURCE_PATH",
         value=[
-            os.path.dirname(pkg_share) + ":",
-            ur_sim_models + ":",
+            os.path.dirname(demo_pkg_share) + ":",
             EnvironmentVariable("GZ_SIM_RESOURCE_PATH", default_value=""),
         ],
     )
@@ -65,7 +67,6 @@ def generate_launch_description():
         condition=IfCondition(headless),
     )
 
-    from launch_ros.actions import Node
     clock_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -79,24 +80,20 @@ def generate_launch_description():
         actions=[ExecuteProcess(
             cmd=[
                 "gz", "service",
-                "-s", "/world/spray_painting/create",
+                "-s", spawn_topic,
                 "--reqtype", "gz.msgs.EntityFactory",
                 "--reptype", "gz.msgs.Boolean",
                 "--timeout", "20000",
                 "--req",
                 f'sdf_filename: "{nozzle_urdf}" name: "spray_nozzle" allow_renaming: false'
-                ' pose: { position: { x: 0.0 y: 0.0 z: 0.2 } }',
+                ' pose: { position: { x: 0.0 y: 0.0 z: 0.6 }'
+                ' orientation: { x: -0.5 y: 0.5 z: -0.5 w: 0.5 } }',
             ],
             output="screen",
         )],
     )
 
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            "headless",
-            default_value="false",
-            description="Run Gazebo server only (no GUI).",
-        ),
+    return [
         set_gz_version,
         set_plugin_path,
         set_resource_path,
@@ -104,4 +101,21 @@ def generate_launch_description():
         gazebo_headless,
         clock_bridge,
         spawn_nozzle,
+    ]
+
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            "world",
+            default_value="spray_painting",
+            description="SDF world stem (filename without .sdf). "
+                        "Available: spray_painting, test_all_geometry, test_complex_meshes, test_cube",
+        ),
+        DeclareLaunchArgument(
+            "headless",
+            default_value="false",
+            description="Run Gazebo server only (no GUI).",
+        ),
+        OpaqueFunction(function=launch_setup),
     ])

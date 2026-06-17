@@ -2,20 +2,13 @@
 <robot name="spray_gun_robot">
 
   <!-- Spray Gun Base Link -->
-  <!-- Spray gun body (placeholder box until spray_gun.glb is restored) -->
   <link name="spray_gun_base_link">
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.05 0.05 0.2"/>
+        <mesh filename="package://gz_spray_painting_plugin_demo/meshes/spray_gun/spray_gun.glb" scale="1 1 1"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.05 0.05 0.2"/>
-      </geometry>
-    </collision>
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <mass value="1.0"/>
@@ -43,7 +36,7 @@
   <joint name="nozzle_joint" type="fixed">
     <parent link="spray_gun_base_link"/>
     <child  link="spray_gun_nozzle_link"/>
-    <origin xyz="0.12 0 0.1" rpy="0 -0.25 0"/>
+    <origin xyz="0.0 -0.13 0.16" rpy="0.0 -1.57 0.0"/>
   </joint>
 
   <gazebo reference="nozzle_joint">

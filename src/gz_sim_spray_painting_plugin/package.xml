@@ -4,27 +4,14 @@
   <name>gz_sim_spray_painting_plugin</name>
   <version>0.1.0</version>
   <description>Gazebo Sim 8 spray painting simulation plugin</description>
-  <maintainer email="user@example.com">user</maintainer>
+  <maintainer email="kharjun4@gmail.com">topguns837</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Gazebo Harmonic packages (gz-sim8, gz-transport13, gz-msgs10, etc.) are
-       installed from the OSRF APT repository at the Docker image level and are
-       NOT registered in the ROS rosdep database.  CMakeLists.txt finds them
-       via find_package() directly — no rosdep entry is needed.              -->
-
-  <!-- ROS 2 runtime dependencies — these ARE registered rosdep keys -->
-  <exec_depend>ros2launch</exec_depend>
-  <exec_depend>ros_gz_sim</exec_depend>
-  <exec_depend>ros_gz_bridge</exec_depend>
-
-  <!-- UR5e demo dependencies -->
-  <exec_depend>gz_spray_painting_plugin_demo</exec_depend>
-  <exec_depend>ur_moveit_config</exec_depend>
-  <exec_depend>moveit_ros_planning_interface</exec_depend>
-  <exec_depend>moveit_py</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
+  <!-- Gazebo Harmonic packages (gz-sim8, gz-transport13, gz-msgs10, gz-plugin2) are
+       installed from the OSRF APT repository and found via find_package() in
+       CMakeLists.txt — no rosdep entry is needed. -->
 
   <export>
     <build_type>ament_cmake</build_type>

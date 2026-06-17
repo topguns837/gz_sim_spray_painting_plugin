@@ -15,7 +15,7 @@
     gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: false"
 -->
 <sdf version="1.9">
-  <world name="ur_spray_painting">
+  <world name="demo_ellipsoid">
 
     <!-- ── Core simulation plugins ── -->
     <plugin filename="gz-sim-physics-system"
@@ -78,22 +78,25 @@
       </link>
     </model>
 
-    <!-- ── Paint target: 1×1×1 m white box at x=2 ── -->
-    <model name="paint_target">
+    <!-- Paint target: ellipsoid -->
+    <model name="ellipsoid">
       <static>true</static>
-      <pose>2 0 0.5 0 0 0</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry><box><size>1 1 1</size></box></geometry>
-        </collision>
-        <visual name="box_visual">
-          <geometry><box><size>1 1 1</size></box></geometry>
-          <material>
-            <ambient>0.95 0.95 0.95 1</ambient>
-            <diffuse>0.95 0.95 0.95 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
+      <pose>0.6 0 0.5 3.14 -1.57 3.14</pose>
+      <link name="ellipsoid">
+        <visual name="ellipsoid_visual">
+          <geometry>
+            <ellipsoid>
+              <radii>0.5 0.3 0.2</radii>
+            </ellipsoid>
+          </geometry>
         </visual>
+        <collision name="ellipsoid_collision">
+          <geometry>
+            <ellipsoid>
+              <radii>0.5 0.3 0.2</radii>
+            </ellipsoid>
+          </geometry>
+        </collision>
       </link>
     </model>
 

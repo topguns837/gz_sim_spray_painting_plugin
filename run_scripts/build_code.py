@@ -67,8 +67,7 @@ def build():
     colcon_cmd = (
         ". /opt/ros/humble/setup.bash && "
         "cd /ws && "
-        "GZ_VERSION=harmonic colcon build "
-        # "  --packages-select gz_sim_spray_painting_plugin "
+        "GZ_VERSION=harmonic colcon build --symlink-install "
         "  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo "
         "  --event-handlers console_cohesion+"
     )

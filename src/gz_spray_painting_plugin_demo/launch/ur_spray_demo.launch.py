@@ -3,7 +3,7 @@ ur_spray_demo.launch.py
 =======================
 Single entry-point for the UR5e spray painting demo:
 
-  * Gazebo Harmonic          — loads factory_demo.sdf world
+  * Gazebo Harmonic          — loads car_painting.sdf world
   * ros_gz_bridge            — /clock (GZ→ROS) + /spray_paint/trigger (ROS→GZ)
   * robot_state_publisher    — publishes TF from the spray URDF
   * joint_state_publisher    — provides correct initial pose until JSB starts
@@ -14,11 +14,13 @@ Single entry-point for the UR5e spray painting demo:
 
 Usage:
   ros2 launch gz_spray_painting_plugin_demo ur_spray_demo.launch.py
-  ros2 launch gz_spray_painting_plugin_demo ur_spray_demo.launch.py headless:=true ur_type:=ur5e
+  ros2 launch gz_spray_painting_plugin_demo ur_spray_demo.launch.py headless:=true
 """
 
 import os
+import re
 import subprocess
+import traceback
 
 from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
@@ -37,23 +39,23 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def launch_setup(context, *args, **kwargs):
-    ur_type  = LaunchConfiguration("ur_type")
     headless = LaunchConfiguration("headless")
 
-    # Assets live in gz_sim_spray_painting_plugin (world, URDF, bridge config, RViz config).
-    spray_pkg_share  = get_package_share_directory("gz_sim_spray_painting_plugin")
+    # Plugin package: libSprayPaintPlugin.so
     spray_pkg_prefix = get_package_prefix("gz_sim_spray_painting_plugin")
 
-    description_file = os.path.join(spray_pkg_share, "urdf", "ur_spray_gz.urdf.xacro")
+    # Demo package: URDF, configs, worlds, models, RViz
+    demo_pkg_share = get_package_share_directory("gz_spray_painting_plugin_demo")
+
+    description_file = os.path.join(demo_pkg_share, "urdf", "ur_spray_gz.urdf.xacro")
     controllers_file = PathJoinSubstitution(
         [FindPackageShare("gz_spray_painting_plugin_demo"), "config", "ur_sim_controllers.yaml"]
     ).perform(context)
 
     # ── Build robot description URDF ─────────────────────────────────────────
-    ur_type_str = ur_type.perform(context)
     xacro_cmd = [
         "xacro", description_file,
-        f"ur_type:={ur_type_str}",
+        "ur_type:=ur5e",
         f"simulation_controllers:={controllers_file}",
         "safety_limits:=true",
         "name:=ur",
@@ -79,14 +81,12 @@ def launch_setup(context, *args, **kwargs):
     set_resource_path = SetEnvironmentVariable(
         name="GZ_SIM_RESOURCE_PATH",
         value=[
-            os.path.dirname(spray_pkg_share) + ":",
-            "/ws/install/gz_spray_painting_plugin_demo/share:",
+            os.path.dirname(demo_pkg_share) + ":",
             EnvironmentVariable("GZ_SIM_RESOURCE_PATH", default_value=""),
         ],
     )
 
-    ur_sim_pkg_share = get_package_share_directory("gz_spray_painting_plugin_demo")
-    world_path = os.path.join(ur_sim_pkg_share, "worlds", "factory_demo.sdf")
+    world_path = os.path.join(demo_pkg_share, "worlds", "demo_car.sdf")
 
     gazebo = ExecuteProcess(
         cmd=["gz", "sim", world_path, "-r", "-v", "4"],
@@ -100,7 +100,7 @@ def launch_setup(context, *args, **kwargs):
     )
 
     # ── ros_gz_bridge ─────────────────────────────────────────────────────────
-    bridge_config = os.path.join(spray_pkg_share, "config", "ros_gz_bridge.yaml")
+    bridge_config = os.path.join(demo_pkg_share, "config", "ros_gz_bridge.yaml")
     ros_gz_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -142,7 +142,7 @@ def launch_setup(context, *args, **kwargs):
         actions=[ExecuteProcess(
             cmd=[
                 "gz", "service",
-                "-s", "/world/factory/create",
+                "-s", "/world/demo_car/create",
                 "--reqtype", "gz.msgs.EntityFactory",
                 "--reptype", "gz.msgs.Boolean",
                 "--timeout", "30000",
@@ -151,7 +151,7 @@ def launch_setup(context, *args, **kwargs):
                     f'sdf_filename: "{urdf_tmp}" '
                     f'name: "ur" '
                     f'allow_renaming: false '
-                    f'pose: {{ position: {{x: 0.50 y: -5.90 z: 0.80}} '
+                    f'pose: {{ position: {{x: 0.0 y: 0.0 z: 0.80}} '
                     f'orientation: {{x: 0 y: 0 z: 0.7071 w: 0.7071}} }}'
                 ),
             ],
@@ -191,7 +191,6 @@ def launch_setup(context, *args, **kwargs):
     moveit_actions = []
     try:
         from ur_moveit_config.launch_common import load_yaml  # noqa: PLC0415
-        import re as _re
 
         moveit_pkg_share = get_package_share_directory("ur_moveit_config")
 
@@ -200,7 +199,8 @@ def launch_setup(context, *args, **kwargs):
             ["xacro", srdf_xacro, "name:=ur", "prefix:="],
             env=xacro_env, stderr=subprocess.PIPE,
         ).decode()
-        srdf_str = _re.sub(
+        # Redirect the planning chain tip to the spray nozzle instead of tool0
+        srdf_str = re.sub(
             r'(<chain\b[^>]*\btip_link=")[^"]+(")',
             r'\1spray_gun_nozzle_link\2',
             srdf_str,
@@ -209,9 +209,7 @@ def launch_setup(context, *args, **kwargs):
             "robot_description_semantic": ParameterValue(srdf_str, value_type=str)
         }
 
-        kinematics_yaml = load_yaml("gz_spray_painting_plugin_demo", "config/kinematics.yaml")
-        robot_description_kinematics = {"robot_description_kinematics": kinematics_yaml}
-
+        kinematics_yaml    = load_yaml("gz_spray_painting_plugin_demo", "config/kinematics.yaml")
         joint_limits_yaml  = load_yaml("ur_moveit_config", "config/joint_limits.yaml")
         ompl_planning_yaml = load_yaml("ur_moveit_config", "config/ompl_planning.yaml")
         controllers_yaml   = load_yaml("ur_moveit_config", "config/controllers.yaml")
@@ -252,30 +250,14 @@ def launch_setup(context, *args, **kwargs):
             "publish_state_updates": True,
             "publish_transforms_updates": True,
         }
-        warehouse_cfg = {
-            "warehouse_plugin": "warehouse_ros_sqlite::DatabaseConnection",
-            "warehouse_host": os.path.expanduser("~/.ros/warehouse_ros.sqlite"),
-        }
-        initial_positions = {
-            "initial_positions": {
-                "shoulder_pan_joint":  0.0,
-                "shoulder_lift_joint": -1.5708,
-                "elbow_joint":          1.5708,
-                "wrist_1_joint":       -1.5708,
-                "wrist_2_joint":       -1.5708,
-                "wrist_3_joint":        0.0,
-            }
-        }
 
         common_params = [
             robot_description,
             robot_description_semantic,
-            robot_description_kinematics,
+            {"robot_description_kinematics": kinematics_yaml},
             {"robot_description_planning": joint_limits_yaml},
             ompl_pipeline,
             {"use_sim_time": True},
-            warehouse_cfg,
-            initial_positions,
         ]
 
         move_group_node = Node(
@@ -290,7 +272,7 @@ def launch_setup(context, *args, **kwargs):
             ],
         )
 
-        rviz_cfg = os.path.join(spray_pkg_share, "config", "moveit.rviz")
+        rviz_cfg = os.path.join(demo_pkg_share, "config", "moveit.rviz")
         rviz_node = Node(
             package="rviz2",
             executable="rviz2",
@@ -303,7 +285,6 @@ def launch_setup(context, *args, **kwargs):
         moveit_actions = [move_group_node, rviz_node]
 
     except Exception as exc:
-        import traceback
         print(f"\n[ur_spray_demo] MoveIt failed to load — skipping.\n"
               f"  Error: {exc}\n{traceback.format_exc()}")
 
@@ -324,16 +305,6 @@ def launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument(
-            "ur_type",
-            default_value="ur5e",
-            description="Type/series of UR robot.",
-            choices=[
-                "ur3", "ur5", "ur10",
-                "ur3e", "ur5e", "ur7e", "ur10e", "ur12e", "ur16e",
-                "ur8long", "ur15", "ur18", "ur20", "ur30",
-            ],
-        ),
         DeclareLaunchArgument(
             "headless",
             default_value="false",

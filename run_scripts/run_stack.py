@@ -2,91 +2,138 @@
 """
 run_stack.py
 ────────────
-Launches the full spray paint simulation stack inside a single Docker container.
+Runs INSIDE the Docker container. Presents a world-selection menu built by
+scanning the installed worlds directory, then creates the appropriate tmux
+session and attaches.
 
-The tmux session is created INSIDE the container by container_tmux_setup.sh.
-Killing the tmux session (or closing all windows) stops the container.
+World mode is determined solely by filename:
+  car_painting.sdf  →  UR mode  (UR5e + MoveIt + cartesian spray)
+  everything else   →  demo mode (Gazebo + spray nozzle only)
 
-tmux layout (inside the container)
-───────────────────────────────────
-  Window 0 – sim
-      pane 0 : ur_spray_demo.launch.py – Gazebo + robot spawn + MoveIt (all-in-one)
-  Window 1 – cartesian_spray
-      pane 0 : cartesian_spray.launch.py (pre-typed, press Enter to run)
-      pane 1 : ros2 topic echo /joint_states
-  Window 2 – spray_control
-      pane 0 : spray ON  command (press Enter to fire)
-      pane 1 : spray OFF command (press Enter to fire)
+Adding or removing .sdf files from the worlds directory automatically updates
+the menu — no code changes required.
+
+tmux layouts
+────────────
+  UR mode:
+    Window 0 – sim            : ur_spray_demo.launch.py (Gazebo + UR5e + MoveIt)
+    Window 1 – cartesian_spray: cartesian_spray.launch.py (auto-runs after 20 s)
+    Window 2 – spray_control  : spray ON/OFF pre-typed
+
+  Demo mode:
+    Window 0 – sim            : demo.launch.py world:=<stem>
+    Window 1 – spray_control  : spray ON/OFF pre-typed
 """
 
 import os
-import shutil
 import subprocess
 import sys
 
-# ── Config ────────────────────────────────────────────────────────────────────
-SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
-PROJECT_DIR = os.path.dirname(SCRIPT_DIR)
-RUN_DOCKER  = os.path.join(SCRIPT_DIR, "run_docker.sh")
-IMAGE_NAME  = "spray_paint_plugin"
-CONTAINER   = "spray_paint_stack"
+SESSION   = "spray_paint"
+TMUX_CONF = "/tmp/.tmux_spray.conf"
+ROS       = ". /opt/ros/humble/setup.bash && . /ws/install/setup.bash 2>/dev/null || true"
 
-# ── Colours ───────────────────────────────────────────────────────────────────
-R = "\033[0;31m"; G = "\033[0;32m"; Y = "\033[1;33m"
-C = "\033[0;36m"; B = "\033[1m";    X = "\033[0m"
+UR_WORLD  = "demo_car"
 
+# ── Discover worlds dynamically ───────────────────────────────────────────────
+# Prefer installed share directory; fall back to source tree.
+_INSTALLED = "/ws/install/gz_spray_painting_plugin_demo/share/gz_spray_painting_plugin_demo/worlds"
+_SOURCE    = "/ws/src/gz_spray_painting_plugin_demo/worlds"
+WORLDS_DIR = _INSTALLED if os.path.isdir(_INSTALLED) else _SOURCE
 
-def check_dependency(name: str):
-    if shutil.which(name) is None:
-        print(f"  {R}Error:{X} '{name}' is not installed or not in PATH.")
-        sys.exit(1)
+if not os.path.isdir(WORLDS_DIR):
+    print(f"  Error: worlds directory not found at:\n  {_INSTALLED}\n  {_SOURCE}")
+    sys.exit(1)
 
+def _label(stem: str) -> str:
+    suffix = " (UR5e robot)" if stem == UR_WORLD else ""
+    return stem.replace("_", " ").title() + suffix
 
-def check_docker_image() -> bool:
-    return subprocess.run(
-        ["docker", "image", "inspect", IMAGE_NAME],
-        capture_output=True
-    ).returncode == 0
+# Build menu: car_painting first (if present), rest alphabetically.
+_stems = sorted(
+    os.path.splitext(f)[0]
+    for f in os.listdir(WORLDS_DIR)
+    if f.endswith(".sdf")
+)
+if UR_WORLD in _stems:
+    _stems = [UR_WORLD] + [s for s in _stems if s != UR_WORLD]
 
+WORLDS = [(_label(s), s, "ur" if s == UR_WORLD else "demo") for s in _stems]
 
-def kill_existing():
-    subprocess.run(["docker", "stop", CONTAINER], capture_output=True)
-    subprocess.run(["docker", "rm",   CONTAINER], capture_output=True)
+if not WORLDS:
+    print("  Error: no .sdf worlds found in", WORLDS_DIR)
+    sys.exit(1)
 
+# ── World selection menu ───────────────────────────────────────────────────────
+print("\n  ╔══════════════════════════════════════════════════╗")
+print("  ║          GZ SIM – SELECT A WORLD                 ║")
+print("  ╚══════════════════════════════════════════════════╝\n")
+for i, (label, _, _) in enumerate(WORLDS, 1):
+    print(f"  [{i}] {label}")
+print()
 
-def launch():
-    print(f"\n{G}{B}▶ Launching spray paint stack{X}\n")
+try:
+    raw = input("  Choice: ").strip()
+    idx = int(raw) - 1
+    if not (0 <= idx < len(WORLDS)):
+        raise ValueError
+except (ValueError, EOFError):
+    print("  Invalid choice — exiting.")
+    sys.exit(1)
 
-    # ── Pre-flight ────────────────────────────────────────────────────────────
-    check_dependency("docker")
+label, world_stem, mode = WORLDS[idx]
+print(f"\n  Launching: {label}\n")
 
-    if not os.path.isfile(RUN_DOCKER):
-        print(f"  {R}Error:{X} run_docker.sh not found at {RUN_DOCKER}")
-        sys.exit(1)
-
-    if not check_docker_image():
-        print(f"  {R}Error:{X} Docker image '{IMAGE_NAME}' not found.")
-        print(f"  Run Docker Build (option 3 in the start menu) first.\n")
-        sys.exit(1)
-
-    host_install = os.path.join(PROJECT_DIR, "install")
-    if os.path.isdir(host_install):
-        print(f"  {G}Host install/ found:{X} freshly-built plugin will be used.")
-    else:
-        print(f"  {Y}No host install/ found:{X} plugin baked into image will be used.")
-        print(f"  Run Code Build (option 2) to rebuild after source changes.\n")
-
-    # ── Clean up any stale container ──────────────────────────────────────────
-    kill_existing()
-
-    print(f"  Container : {C}{CONTAINER}{X}")
-    print(f"  Image     : {C}{IMAGE_NAME}{X}")
-    print(f"\n  {Y}Tips (inside tmux):{X} Ctrl-b n → next window  |  Ctrl-b d → detach")
-    print(f"  Killing the tmux session stops the container.\n")
-
-    # ── Hand off to run_docker.sh which starts the container and tmux ─────────
-    os.execvp("bash", ["bash", RUN_DOCKER, f"container_name={CONTAINER}", "tmux_stack"])
+# ── tmux config: arrow keys, true-colour, bash as default shell ───────────────
+with open(TMUX_CONF, "w") as f:
+    f.write('set -g default-terminal "screen-256color"\n')
+    f.write('set -g terminal-overrides ",xterm-256color:Tc"\n')
+    f.write('set-option -g default-shell /bin/bash\n')
 
 
-if __name__ == "__main__":
-    launch()
+def tmux(*args):
+    subprocess.run(["tmux", "-f", TMUX_CONF, *args], check=True)
+
+
+def send(target, cmd, enter=True):
+    tmux("send-keys", "-t", f"{SESSION}:{target}", cmd, *(["Enter"] if enter else [""]))
+
+
+# ── Build tmux session ────────────────────────────────────────────────────────
+if mode == "ur":
+    # ── Window 0: sim (full UR5e stack) ──────────────────────────────────────
+    tmux("new-session", "-d", "-s", SESSION, "-n", "sim", "-x", "220", "-y", "50")
+    send("sim.0", f"{ROS} && ros2 launch gz_spray_painting_plugin_demo ur_spray_demo.launch.py")
+
+    # ── Window 1: cartesian_spray ─────────────────────────────────────────────
+    tmux("new-window", "-t", SESSION, "-n", "cartesian_spray")
+    send("cartesian_spray.0",
+         f"sleep 20 && {ROS} && ros2 launch gz_spray_painting_plugin_demo cartesian_spray.launch.py")
+
+    # ── Window 2: spray_control ───────────────────────────────────────────────
+    tmux("new-window", "-t", SESSION, "-n", "spray_control")
+    send("spray_control.0",
+         'gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: true"', enter=False)
+    tmux("split-window", "-t", f"{SESSION}:spray_control", "-v", "-p", "50")
+    send("spray_control.1",
+         'gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: false"', enter=False)
+    tmux("select-pane", "-t", f"{SESSION}:spray_control.0")
+
+else:
+    # ── Window 0: sim (nozzle-only demo) ─────────────────────────────────────
+    tmux("new-session", "-d", "-s", SESSION, "-n", "sim", "-x", "220", "-y", "50")
+    send("sim.0",
+         f"{ROS} && ros2 launch gz_spray_painting_plugin_demo demo.launch.py world:={world_stem}")
+
+    # ── Window 1: spray_control ───────────────────────────────────────────────
+    tmux("new-window", "-t", SESSION, "-n", "spray_control")
+    send("spray_control.0",
+         'gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: true"', enter=False)
+    tmux("split-window", "-t", f"{SESSION}:spray_control", "-v", "-p", "50")
+    send("spray_control.1",
+         'gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: false"', enter=False)
+    tmux("select-pane", "-t", f"{SESSION}:spray_control.0")
+
+# ── Focus sim window and attach ───────────────────────────────────────────────
+tmux("select-window", "-t", f"{SESSION}:sim")
+os.execvp("tmux", ["tmux", "-f", TMUX_CONF, "attach-session", "-t", SESSION])

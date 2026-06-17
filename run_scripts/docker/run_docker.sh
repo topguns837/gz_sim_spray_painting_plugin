@@ -3,20 +3,20 @@
 # run_docker.sh  –  Start the spray-paint simulation container
 #
 # Usage:
-#   ./run_scripts/run_docker.sh [container_name=<name>] [headless] [shell] [detach]
+#   ./run_scripts/docker/run_docker.sh [container_name=<name>] [headless] [detach] [empty_container]
 #
 # Arguments (all optional):
 #   container_name=<name>   Override the default container name
 #   headless                Run gz sim server-only (no GUI), default is GUI mode
-#   empty_container         Open an interactive bash shell in the container
 #   detach                  Start container in background with sleep infinity
-#                           (used by run_stack.py; launch files run via docker exec)
+#                           (used by startScript.sh; launch files run via docker exec)
+#   empty_container         Open an interactive bash shell in the container
 #
 # Examples:
-#   ./run_scripts/run_docker.sh
-#   ./run_scripts/run_docker.sh headless
-#   ./run_scripts/run_docker.sh empty_container
-#   ./run_scripts/run_docker.sh container_name=my_sim detach
+#   ./run_scripts/docker/run_docker.sh
+#   ./run_scripts/docker/run_docker.sh headless
+#   ./run_scripts/docker/run_docker.sh empty_container
+#   ./run_scripts/docker/run_docker.sh container_name=my_sim detach
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -e
@@ -24,7 +24,7 @@ set -e
 # ── Defaults ──────────────────────────────────────────────────────────────────
 CONTAINER_NAME="spray_paint_stack"
 HEADLESS=false
-MODE="standalone"   # standalone | tmux_stack | empty_container
+MODE="standalone"   # standalone | detach | empty_container
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 for arg in "$@"; do
@@ -35,8 +35,8 @@ for arg in "$@"; do
         headless)
             HEADLESS=true
             ;;
-        tmux_stack)
-            MODE="tmux_stack"
+        detach)
+            MODE="detach"
             ;;
         empty_container)
             MODE="empty_container"
@@ -46,15 +46,15 @@ for arg in "$@"; do
             echo "Allowed arguments:"
             echo "  container_name=<name>"
             echo "  headless"
+            echo "  detach"
             echo "  empty_container"
-            echo "  tmux_stack"
             exit 1
             ;;
     esac
 done
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd)"
 PLATFORM="$(uname -m)"
 IMAGE_NAME="spray_paint_plugin"
 
@@ -210,15 +210,14 @@ if [ "$MODE" = "empty_container" ]; then
         "${DOCKER_ARGS[@]}" \
         "$IMAGE_NAME" \
         bash
-elif [ "$MODE" = "tmux_stack" ]; then
-    # Run the full simulation stack inside a tmux session inside the container.
-    # The container stops when the tmux session ends.
-    echo "-> Mode: tmux_stack (tmux session runs inside container)"
-    docker run -it --rm \
+elif [ "$MODE" = "detach" ]; then
+    echo "-> Mode: detach (container starts in background; exec into it to run workload)"
+    docker run -d \
         "${COMMON_FLAGS[@]}" \
         "${DOCKER_ARGS[@]}" \
         "$IMAGE_NAME" \
-        bash /ws/run_scripts/container_tmux_setup.sh
+        sleep infinity
+    echo "-> Container '$CONTAINER_NAME' is running in the background."
 else
     # Standalone: run the full demo stack directly (manual / CI use).
     if [ "$HEADLESS" = true ]; then

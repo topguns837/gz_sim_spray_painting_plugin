@@ -1,0 +1,101 @@
+<?xml version="1.0" ?>
+<!--
+  Spray Painting Demo World
+  =========================
+  Contains only the environment (ground, lighting, paint target).
+  The spray_nozzle_robot is spawned separately via the launch file from
+  urdf/spray_nozzle.urdf using ros_gz_sim.
+
+  Usage (via launch file):
+    ros2 launch gz_sim_spray_painting_plugin spawn_robot.launch.py
+
+  Trigger spray:
+    gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: true"
+  Stop spray:
+    gz topic -t /spray_paint/trigger -m gz.msgs.Boolean -p "data: false"
+-->
+<sdf version="1.9">
+  <world name="demo_cylinder">
+
+    <!-- ── Core simulation plugins ── -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <!-- Sensors system drives the render thread (needed for PreRender events). -->
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <!-- Particle emitter system — processes ParticleEmitterCmd to toggle emitters. -->
+    <plugin filename="gz-sim-particle-emitter-system"
+            name="gz::sim::systems::ParticleEmitter"/>
+
+    <!-- ── Physics ── -->
+    <physics name="1ms" type="dart">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <dart>
+        <collision_detector>bullet</collision_detector>
+      </dart>
+    </physics>
+
+    <!-- ── Lighting ── -->
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.8 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 -0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- ── Ground plane ── -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane><normal>0 0 1</normal><size>20 20</size></plane>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.8 1</ambient>
+            <diffuse>0.8 0.8 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- ── Paint target: cylinder (r=0.5 m, h=1 m) at x=1.12 ── -->
+    <model name="cylinder">
+      <static>true</static>
+      <pose>1.12 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><cylinder><radius>0.5</radius><length>1</length></cylinder></geometry>
+        </collision>
+        <visual name="cylinder_visual">
+          <geometry><cylinder><radius>0.5</radius><length>1</length></cylinder></geometry>
+          <material>
+            <ambient>0.95 0.95 0.95 1</ambient>
+            <diffuse>0.95 0.95 0.95 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

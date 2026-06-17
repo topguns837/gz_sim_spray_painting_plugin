@@ -30,10 +30,5 @@ target_link_libraries(SprayPaintPlugin
 install(TARGETS SprayPaintPlugin
   DESTINATION lib/${PROJECT_NAME}
 )
-install(DIRECTORY worlds/  DESTINATION share/${PROJECT_NAME}/worlds)
-install(DIRECTORY urdf/    DESTINATION share/${PROJECT_NAME}/urdf)
-install(DIRECTORY launch/  DESTINATION share/${PROJECT_NAME}/launch)
-install(DIRECTORY config/  DESTINATION share/${PROJECT_NAME}/config)
-install(DIRECTORY meshes/  DESTINATION share/${PROJECT_NAME}/meshes)
 
 ament_package()
