@@ -123,6 +123,7 @@ def launch_setup(context, *args, **kwargs):
         parameters=[
             robot_description,
             {
+                "use_sim_time": True,
                 "rate": 10,
                 "zeros.shoulder_lift_joint": -1.5708,
                 "zeros.elbow_joint":          1.5708,
@@ -272,17 +273,17 @@ def launch_setup(context, *args, **kwargs):
             ],
         )
 
-        rviz_cfg = os.path.join(demo_pkg_share, "config", "moveit.rviz")
-        rviz_node = Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2_moveit",
-            output="log",
-            arguments=["-d", rviz_cfg],
-            parameters=common_params,
-        )
+        # rviz_cfg = os.path.join(demo_pkg_share, "config", "moveit.rviz")
+        # rviz_node = Node(
+        #     package="rviz2",
+        #     executable="rviz2",
+        #     name="rviz2_moveit",
+        #     output="log",
+        #     arguments=["-d", rviz_cfg],
+        #     parameters=common_params,
+        # )
 
-        moveit_actions = [move_group_node, rviz_node]
+        moveit_actions = [move_group_node]  # rviz_node disabled
 
     except Exception as exc:
         print(f"\n[ur_spray_demo] MoveIt failed to load — skipping.\n"

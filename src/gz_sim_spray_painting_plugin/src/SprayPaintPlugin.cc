@@ -53,9 +53,7 @@ namespace gz::sim::systems
 
 SprayPaintPlugin::SprayPaintPlugin() = default;
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Logging helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 std::string SprayPaintPlugin::Timestamp() const
 {
@@ -82,11 +80,6 @@ void SprayPaintPlugin::Log(const std::string &level,
 
   const std::string out = line.str();
   gzmsg << out;
-  if (logFile_.is_open())
-  {
-    logFile_ << out;
-    logFile_.flush();
-  }
 }
 
 void SprayPaintPlugin::Log(const std::string &step, const std::string &msg)
@@ -99,16 +92,9 @@ void SprayPaintPlugin::LogSection(const std::string &title)
   const std::string bar(60, '=');
   const std::string entry = "\n" + bar + "\n  " + title + "\n" + bar + "\n";
   gzmsg << entry;
-  if (logFile_.is_open())
-  {
-    logFile_ << entry;
-    logFile_.flush();
-  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // MakePatch
-// ─────────────────────────────────────────────────────────────────────────────
 
 SprayPaintPlugin::PaintPatch SprayPaintPlugin::MakePatch(
     const gz::math::Vector3d &_hitWorld,
@@ -145,9 +131,7 @@ SprayPaintPlugin::PaintPatch SprayPaintPlugin::MakePatch(
   return result;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // GenerateConeRays
-// ─────────────────────────────────────────────────────────────────────────────
 
 std::vector<std::pair<gz::math::Vector3d, gz::math::Vector3d>>
 SprayPaintPlugin::GenerateConeRays() const
@@ -178,9 +162,7 @@ SprayPaintPlugin::GenerateConeRays() const
   return rays;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // FindHitLink
-// ─────────────────────────────────────────────────────────────────────────────
 
 gz::sim::Entity SprayPaintPlugin::FindHitLink(
     const gz::math::Vector3d &hitWorld,
@@ -236,9 +218,7 @@ gz::sim::Entity SprayPaintPlugin::FindHitLink(
   return bestLink;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // Configure
-// ─────────────────────────────────────────────────────────────────────────────
 
 void SprayPaintPlugin::Configure(
     const Entity & /*_entity*/,
@@ -246,7 +226,7 @@ void SprayPaintPlugin::Configure(
     EntityComponentManager &_ecm,
     EventManager &_eventMgr)
 {
-  // ── 1. Read SDF parameters ────────────────────────────────────────────────
+  // 1. Read SDF parameters
   if (_sdf->HasElement("nozzle_link"))
     nozzleLink_ = _sdf->Get<std::string>("nozzle_link");
 
@@ -274,47 +254,17 @@ void SprayPaintPlugin::Configure(
   if (_sdf->HasElement("num_rays"))
     numRays_ = std::max(1, _sdf->Get<int>("num_rays"));
 
-  // ── 2. Cache EventManager pointer ─────────────────────────────────────────
+  if (_sdf->HasElement("enable_particle_emitter"))
+    enableParticleEmitter_ = _sdf->Get<bool>("enable_particle_emitter");
+
+  // 2. Cache EventManager pointer
   eventMgr_ = &_eventMgr;
 
-  // ── 3. Subscribe to trigger topic ─────────────────────────────────────────
+  // 3. Subscribe to trigger topic
   transportNode_.Subscribe(sprayTopic_, &SprayPaintPlugin::OnSprayMsg, this);
 
-  // ── 4. Open log file ──────────────────────────────────────────────────────
-  namespace fs = std::filesystem;
-  const fs::path logDir = "/ws/file_logs";
-
-  std::error_code ec;
-  fs::create_directories(logDir, ec);
-  if (ec)
-  {
-    gzerr << "[SprayPaintPlugin] FATAL: cannot create log dir "
-          << logDir << " – " << ec.message() << "\n";
-  }
-
-  {
-    using namespace std::chrono;
-    const auto now   = system_clock::now();
-    const auto now_t = system_clock::to_time_t(now);
-    std::ostringstream fname;
-    fname << std::put_time(std::localtime(&now_t), "spray_paint_%Y-%m-%d_%H-%M-%S");
-    fname << ".log";
-    logPath_ = (logDir / fname.str()).string();
-  }
-
-  logFile_.open(logPath_, std::ios::out | std::ios::trunc);
-  if (!logFile_.is_open())
-  {
-    gzerr << "[SprayPaintPlugin] FATAL: cannot open log file: " << logPath_ << "\n";
-  }
-  else
-  {
-    gzmsg << "[SprayPaintPlugin] Logging to: " << logPath_ << "\n";
-  }
-
-  // ── 5. Log startup banner ─────────────────────────────────────────────────
+  // 4. Log startup banner
   LogSection("SprayPaintPlugin  –  Configure");
-  Log("Configure", "log_file",    logPath_);
   Log("Configure", "nozzle_link", nozzleLink_);
   Log("Configure", "half_angle",
       std::to_string(coneHalfAngle_ * 180.0 / M_PI) + " deg");
@@ -324,16 +274,15 @@ void SprayPaintPlugin::Configure(
       " G=" + std::to_string(sprayColor_.G()) +
       " B=" + std::to_string(sprayColor_.B()));
   Log("Configure", "topic",          sprayTopic_);
-  Log("Configure", "particle_rate",  std::to_string(particleRate_) + " /s");
-  Log("Configure", "patch_spacing",  std::to_string(patchSpacing_) + " m");
-  Log("Configure", "paint_interval", std::to_string(paintIntervalSteps_) + " steps");
-  Log("Configure", "num_rays",       std::to_string(numRays_) + " cone rays per scan");
-  Log("Configure", "status",         "Plugin ready – waiting for nozzle entity");
+  Log("Configure", "particle_rate",     std::to_string(particleRate_) + " /s");
+  Log("Configure", "patch_spacing",     std::to_string(patchSpacing_) + " m");
+  Log("Configure", "paint_interval",    std::to_string(paintIntervalSteps_) + " steps");
+  Log("Configure", "num_rays",          std::to_string(numRays_) + " cone rays per scan");
+  Log("Configure", "particle_emitter",  enableParticleEmitter_ ? "enabled" : "disabled");
+  Log("Configure", "status",            "Plugin ready – waiting for nozzle entity");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // OnSprayMsg
-// ─────────────────────────────────────────────────────────────────────────────
 
 void SprayPaintPlugin::OnSprayMsg(const gz::msgs::Boolean &_msg)
 {
@@ -352,15 +301,13 @@ void SprayPaintPlugin::OnSprayMsg(const gz::msgs::Boolean &_msg)
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PreUpdate
-// ─────────────────────────────────────────────────────────────────────────────
 
 void SprayPaintPlugin::PreUpdate(
     const UpdateInfo & /*_info*/,
     EntityComponentManager &_ecm)
 {
-  // ── STEP 1: Nozzle validity check ─────────────────────────────────────────
+  // STEP 1: Nozzle validity check
   if (nozzleEntity_ != kNullEntity && !_ecm.HasEntity(nozzleEntity_))
   {
     LogSection("PreUpdate – Nozzle Lost");
@@ -374,7 +321,7 @@ void SprayPaintPlugin::PreUpdate(
     patchCenters_.clear();
   }
 
-  // ── STEP 2: Nozzle resolution ─────────────────────────────────────────────
+  // STEP 2: Nozzle resolution
   if (nozzleEntity_ == kNullEntity)
   {
     _ecm.Each<components::Link, components::Name>(
@@ -442,7 +389,7 @@ void SprayPaintPlugin::PreUpdate(
        << ", " << p.Rot().XAxis().Y() << ", " << p.Rot().XAxis().Z() << ")";
     Log("PreUpdate", "nozzle_world_pose", ps.str());
 
-    // ── Attach RaycastData component ──────────────────────────────────────
+    // Attach RaycastData component
     // numRays_ rays spanning the cone solid angle (Fibonacci disk sampling).
     // Rays are in nozzle-local frame; the physics system transforms them by
     // the nozzle world pose each step, so they follow the moving nozzle.
@@ -466,96 +413,100 @@ void SprayPaintPlugin::PreUpdate(
         "  half_angle=" + std::to_string(coneHalfAngle_ * 180.0 / M_PI) + " deg");
   }
 
-  // ── STEP 3: Particle emitter toggle ──────────────────────────────────────
-  if (emitterEntity_ != kNullEntity)
+  // STEP 3 / 3b / 3c: Particle emitter (skipped when disabled in SDF)
+  if (enableParticleEmitter_)
   {
-    const bool active = sprayActive_.load();
-    if (active != lastEmitterState_)
+    // STEP 3: Particle emitter toggle
+    if (emitterEntity_ != kNullEntity)
     {
-      if (!active)
+      const bool active = sprayActive_.load();
+      if (active != lastEmitterState_)
       {
-        // Hard stop: remove the emitter entity entirely so the rendering
-        // side immediately clears all particles.  It is recreated on the
-        // next spray-ON edge (see STEP 3b below).
-        _ecm.RequestRemoveEntity(emitterEntity_);
-        emitterEntity_ = kNullEntity;
-        Log("PreUpdate", "emitter", "OFF – entity removed");
+        if (!active)
+        {
+          // Hard stop: remove the emitter entity entirely so the rendering
+          // side immediately clears all particles.  It is recreated on the
+          // next spray-ON edge (see STEP 3b below).
+          _ecm.RequestRemoveEntity(emitterEntity_);
+          emitterEntity_ = kNullEntity;
+          Log("PreUpdate", "emitter", "OFF – entity removed");
+        }
+        else
+        {
+          // Spray turned ON but emitterEntity_ was just cleared; it will be
+          // recreated in STEP 3b below this block.
+          Log("PreUpdate", "emitter", "ON – recreating emitter");
+        }
+        lastEmitterState_ = active;
       }
-      else
-      {
-        // Spray turned ON but emitterEntity_ was just cleared; it will be
-        // recreated in STEP 3b below this block.
-        Log("PreUpdate", "emitter", "ON – recreating emitter");
-      }
-      lastEmitterState_ = active;
     }
-  }
 
-  // ── STEP 3b: Recreate emitter when spray is ON but entity was removed ────
-  if (sprayActive_ && emitterEntity_ == kNullEntity &&
-      nozzleEntity_ != kNullEntity)
-  {
-    constexpr double kSprayVelocity = 2.0;
-    const double effectiveRange =
-        coneMaxRange_ / (1.0 + std::tan(coneHalfAngle_));
-    const double kLifetime      = effectiveRange / kSprayVelocity;
-    const double coneRadiusAtMax = effectiveRange * std::tan(coneHalfAngle_);
-    constexpr double kInitSize  = 0.001;
-    const double scaleRate =
-        std::max((2.0 * coneRadiusAtMax - kInitSize) / kLifetime, 0.01);
+    // STEP 3b: Recreate emitter when spray is ON but entity was removed
+    if (sprayActive_ && emitterEntity_ == kNullEntity &&
+        nozzleEntity_ != kNullEntity)
+    {
+      constexpr double kSprayVelocity = 2.0;
+      const double effectiveRange =
+          coneMaxRange_ / (1.0 + std::tan(coneHalfAngle_));
+      const double kLifetime      = effectiveRange / kSprayVelocity;
+      const double coneRadiusAtMax = effectiveRange * std::tan(coneHalfAngle_);
+      constexpr double kInitSize  = 0.001;
+      const double scaleRate =
+          std::max((2.0 * coneRadiusAtMax - kInitSize) / kLifetime, 0.01);
 
-    sdf::ParticleEmitter emitterSdf;
-    emitterSdf.SetName("spray_emitter_" + std::to_string(++emitterCounter_));
-    emitterSdf.SetType(sdf::ParticleEmitterType::POINT);
-    emitterSdf.SetEmitting(true);
-    emitterSdf.SetRate(particleRate_);
-    emitterSdf.SetDuration(0.0);
-    emitterSdf.SetLifetime(kLifetime);
-    emitterSdf.SetMinVelocity(kSprayVelocity * 0.9);
-    emitterSdf.SetMaxVelocity(kSprayVelocity * 1.1);
-    emitterSdf.SetColorStart(sprayColor_);
-    emitterSdf.SetColorEnd(
-        gz::math::Color(sprayColor_.R(), sprayColor_.G(),
-                        sprayColor_.B(), 0.0f));
-    emitterSdf.SetParticleSize(
-        gz::math::Vector3d(kInitSize, kInitSize, kInitSize));
-    emitterSdf.SetScaleRate(scaleRate);
-    emitterSdf.SetSize(gz::math::Vector3d(0.005, 0.005, 0.005));
+      sdf::ParticleEmitter emitterSdf;
+      emitterSdf.SetName("spray_emitter_" + std::to_string(++emitterCounter_));
+      emitterSdf.SetType(sdf::ParticleEmitterType::POINT);
+      emitterSdf.SetEmitting(true);
+      emitterSdf.SetRate(particleRate_);
+      emitterSdf.SetDuration(0.0);
+      emitterSdf.SetLifetime(kLifetime);
+      emitterSdf.SetMinVelocity(kSprayVelocity * 0.9);
+      emitterSdf.SetMaxVelocity(kSprayVelocity * 1.1);
+      emitterSdf.SetColorStart(sprayColor_);
+      emitterSdf.SetColorEnd(
+          gz::math::Color(sprayColor_.R(), sprayColor_.G(),
+                          sprayColor_.B(), 0.0f));
+      emitterSdf.SetParticleSize(
+          gz::math::Vector3d(kInitSize, kInitSize, kInitSize));
+      emitterSdf.SetScaleRate(scaleRate);
+      emitterSdf.SetSize(gz::math::Vector3d(0.005, 0.005, 0.005));
 
-    // Local pose zero relative to nozzle — SetParent keeps it as-is (LOCAL).
-    // STEP 3c re-asserts zero every PreUpdate so any SetParent-induced drift
-    // on 2nd+ activations is corrected before PostUpdate renders it.
-    emitterSdf.SetRawPose(gz::math::Pose3d(0, 0, 0, 0, 0, 0));
+      // Local pose zero relative to nozzle — SetParent keeps it as-is (LOCAL).
+      // STEP 3c re-asserts zero every PreUpdate so any SetParent-induced drift
+      // on 2nd+ activations is corrected before PostUpdate renders it.
+      emitterSdf.SetRawPose(gz::math::Pose3d(0, 0, 0, 0, 0, 0));
 
-    sdf::Material emitterMat;
-    emitterMat.SetAmbient(sprayColor_);
-    emitterMat.SetDiffuse(sprayColor_);
-    emitterMat.SetEmissive(sprayColor_);
-    emitterSdf.SetMaterial(emitterMat);
+      sdf::Material emitterMat;
+      emitterMat.SetAmbient(sprayColor_);
+      emitterMat.SetDiffuse(sprayColor_);
+      emitterMat.SetEmissive(sprayColor_);
+      emitterSdf.SetMaterial(emitterMat);
 
-    gz::sim::SdfEntityCreator creator(_ecm, *eventMgr_);
-    emitterEntity_ = creator.CreateEntities(&emitterSdf);
-    creator.SetParent(emitterEntity_, nozzleEntity_);
+      gz::sim::SdfEntityCreator creator(_ecm, *eventMgr_);
+      emitterEntity_ = creator.CreateEntities(&emitterSdf);
+      creator.SetParent(emitterEntity_, nozzleEntity_);
 
-    Log("PreUpdate", "emitter",
-        "recreated entity=" + std::to_string(emitterEntity_));
-  }
+      Log("PreUpdate", "emitter",
+          "recreated entity=" + std::to_string(emitterEntity_));
+    }
 
-  // ── STEP 3c: Force emitter local Pose to zero every frame ────────────────
-  // Uses CreateComponent (not raw pointer write) so the ECM marks the Pose
-  // as Changed, triggering the renderer to reposition the Ogre2 scene node.
-  // World pose = nozzle_world + local(0,0,0) = nozzle_world ✓ every cycle.
-  if (emitterEntity_ != kNullEntity)
-  {
-    _ecm.CreateComponent(emitterEntity_,
-        gz::sim::components::Pose(gz::math::Pose3d::Zero));
-  }
+    // STEP 3c: Force emitter local Pose to zero every frame
+    // Uses CreateComponent (not raw pointer write) so the ECM marks the Pose
+    // as Changed, triggering the renderer to reposition the Ogre2 scene node.
+    // World pose = nozzle_world + local(0,0,0) = nozzle_world every cycle.
+    if (emitterEntity_ != kNullEntity)
+    {
+      _ecm.CreateComponent(emitterEntity_,
+          gz::sim::components::Pose(gz::math::Pose3d::Zero));
+    }
+  }  // enableParticleEmitter_
 
-  // ── STEP 4: Guard – do nothing if spray not active ────────────────────────
+  // STEP 4: Guard – do nothing if spray not active
   if (!sprayActive_)
     return;
 
-  // ── STEP 5: One-shot diagnostic on spray-ON edge ─────────────────────────
+  // STEP 5: One-shot diagnostic on spray-ON edge
   if (!debugDumped_)
   {
     debugDumped_ = true;
@@ -573,11 +524,11 @@ void SprayPaintPlugin::PreUpdate(
         std::to_string(patchCenters_.size()) + " links painted so far");
   }
 
-  // ── STEP 6: Rate-limit paint scan ─────────────────────────────────────────
+  // STEP 6: Rate-limit paint scan
   if ((++paintStepCounter_ % paintIntervalSteps_) != 0)
     return;
 
-  // ── STEP 7: Read physics raycast results ──────────────────────────────────
+  // STEP 7: Read physics raycast results
   if (!raysAttached_) return;
 
   const auto *raycastComp =
@@ -587,7 +538,7 @@ void SprayPaintPlugin::PreUpdate(
 
   const gz::math::Pose3d nozzlePose = gz::sim::worldPose(nozzleEntity_, _ecm);
 
-  // ── STEP 8: Build spray material ─────────────────────────────────────────
+  // STEP 8: Build spray material
   sdf::Material sdfMat;
   sdfMat.SetAmbient(sprayColor_);
   sdfMat.SetDiffuse(sprayColor_);
@@ -596,7 +547,7 @@ void SprayPaintPlugin::PreUpdate(
       sprayColor_.G() * 0.3f,
       sprayColor_.B() * 0.3f, 1.0f));
 
-  // ── STEP 9: Create paint patches from raycast hits ────────────────────────
+  // STEP 9: Create paint patches from raycast hits
   for (const auto &res : raycastComp->Data().results)
   {
     // fraction == 0 → no hit; fraction == 1 → hit at max range (wall of world)
@@ -664,15 +615,15 @@ void SprayPaintPlugin::PreUpdate(
     {
       const gz::math::Vector3d euler = patch.worldPose.Rot().Euler();
       std::ostringstream pm;
-      pm << "patch=" << patchName
-         << "  dist=" << dist << " m"
-         << "  hit=(" << hitWorld.X() << ", " << hitWorld.Y()
-         << ", " << hitWorld.Z() << ")"
-         << "  normal=(" << normWorld.X() << ", " << normWorld.Y()
-         << ", " << normWorld.Z() << ")"
-         << "  parent_link=" << patchParent
-         << "  total=" << centers.size();
-      Log("PreUpdate", "painted", pm.str());
+      // pm << "patch=" << patchName
+      //    << "  dist=" << dist << " m"
+      //    << "  hit=(" << hitWorld.X() << ", " << hitWorld.Y()
+      //    << ", " << hitWorld.Z() << ")"
+      //    << "  normal=(" << normWorld.X() << ", " << normWorld.Y()
+      //    << ", " << normWorld.Z() << ")"
+      //    << "  parent_link=" << patchParent
+      //    << "  total=" << centers.size();
+      // Log("PreUpdate", "painted", pm.str());
     }
   }
 }

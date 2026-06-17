@@ -3,15 +3,18 @@
 <package format="3">
   <name>gz_sim_spray_painting_plugin</name>
   <version>0.1.0</version>
-  <description>Gazebo Sim 8 spray painting simulation plugin</description>
+  <description>Gazebo Sim 8(Harmonic) spray painting simulation plugin</description>
   <maintainer email="kharjun4@gmail.com">topguns837</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Gazebo Harmonic packages (gz-sim8, gz-transport13, gz-msgs10, gz-plugin2) are
-       installed from the OSRF APT repository and found via find_package() in
-       CMakeLists.txt — no rosdep entry is needed. -->
+  <!-- Gazebo Harmonic packages are installed from the OSRF APT repository and
+       found via find_package() in CMakeLists.txt — no rosdep key is needed. -->
+  <depend>libgz-sim8-dev</depend>
+  <depend>libgz-transport13-dev</depend>
+  <depend>libgz-msgs10-dev</depend>
+  <depend>libgz-plugin2-dev</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

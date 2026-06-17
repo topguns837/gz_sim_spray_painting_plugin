@@ -12,7 +12,7 @@
 -->
 <robot xmlns:xacro="http://wiki.ros.org/xacro" name="ur">
 
-  <!-- ── Forward all standard UR args ────────────────────────────────────── -->
+  <!-- Forward all standard UR args -->
   <xacro:arg name="name"                   default="ur"/>
   <xacro:arg name="ur_type"                default="ur5e"/>
   <xacro:arg name="tf_prefix"              default=""/>
@@ -31,13 +31,18 @@
   <xacro:arg name="simulation_controllers" default=""/>
   <xacro:arg name="ros_namespace"          default=""/>
 
-  <!-- ── Spray tool args (override in launch as needed) ───────────────────── -->
-  <xacro:arg name="cone_half_angle_deg" default="10"/>
-  <xacro:arg name="cone_max_range"      default="0.8"/>
-  <xacro:arg name="spray_color"         default="1.0 0.2 0.1 1.0"/>
-  <xacro:arg name="patch_spacing"       default="0.02"/>
+  <!-- Spray tool args (override in launch as needed) -->
+  <xacro:arg name="cone_half_angle_deg"      default="10"/>
+  <xacro:arg name="cone_max_range"           default="0.8"/>
+  <xacro:arg name="spray_color"              default="1.0 0.2 0.1 1.0"/>
+  <xacro:arg name="spray_topic"              default="/spray_paint/trigger"/>
+  <xacro:arg name="particle_rate"            default="100"/>
+  <xacro:arg name="num_rays"                 default="16"/>
+  <xacro:arg name="patch_spacing"            default="0.02"/>
+  <xacro:arg name="paint_interval_steps"     default="10"/>
+  <xacro:arg name="enable_particle_emitter"  default="true"/>
 
-  <!-- ── Standard UR arm kinematic description (no ros2_control tag yet) ── -->
+  <!-- Standard UR arm kinematic description (no ros2_control tag yet) -->
   <xacro:include filename="$(find gz_spray_painting_plugin_demo)/urdf/ur_macro.xacro"/>
 
   <!-- world anchor -->
@@ -60,7 +65,7 @@
 
   <gazebo reference="world"/>
 
-  <!-- ── gz_ros2_control Gazebo system plugin ─────────────────────────────── -->
+  <!-- gz_ros2_control Gazebo system plugin -->
   <gazebo>
     <plugin filename="gz_ros2_control-system"
             name="gz_ros2_control::GazeboSimROS2ControlPlugin">
@@ -71,7 +76,7 @@
     </plugin>
   </gazebo>
 
-  <!-- ── ros2_control block using gz_ros2_control/GazeboSimSystem ─────────── -->
+  <!-- ros2_control block using gz_ros2_control/GazeboSimSystem -->
   <!--
     Written inline because gz_spray_painting_plugin_demo does not include
     ur_joint_control.xacro (not needed for the UR5e spray demo).
@@ -161,7 +166,7 @@
   <joint name="spray_gun_base_to_tool0" type="fixed">
     <parent link="tool0"/>
     <child  link="spray_gun_base_link"/>
-    <origin xyz="0 0 0" rpy="0 0.0 0"/>
+    <origin xyz="0 0 0" rpy="0 0 -1.57"/>
   </joint>
 
   <gazebo reference="finger_joint">
@@ -193,9 +198,12 @@
       <cone_half_angle_deg>$(arg cone_half_angle_deg)</cone_half_angle_deg>
       <cone_max_range>$(arg cone_max_range)</cone_max_range>
       <spray_color>$(arg spray_color)</spray_color>
-      <spray_topic>/spray_paint/trigger</spray_topic>
-      <particle_rate>100</particle_rate>
+      <spray_topic>$(arg spray_topic)</spray_topic>
+      <particle_rate>$(arg particle_rate)</particle_rate>
+      <num_rays>$(arg num_rays)</num_rays>
       <patch_spacing>$(arg patch_spacing)</patch_spacing>
+      <paint_interval_steps>$(arg paint_interval_steps)</paint_interval_steps>
+      <enable_particle_emitter>$(arg enable_particle_emitter)</enable_particle_emitter>
     </plugin>
   </gazebo>
 
