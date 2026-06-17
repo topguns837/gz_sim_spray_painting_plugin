@@ -40,14 +40,6 @@
 #include <gz/msgs/particle_emitter.pb.h>
 #include <gz/msgs/convert/Color.hh>
 
-GZ_ADD_PLUGIN(gz::sim::systems::SprayPaintPlugin,
-              gz::sim::System,
-              gz::sim::systems::SprayPaintPlugin::ISystemConfigure,
-              gz::sim::systems::SprayPaintPlugin::ISystemPreUpdate)
-
-GZ_ADD_PLUGIN_ALIAS(gz::sim::systems::SprayPaintPlugin,
-                    "gz::sim::systems::SprayPaintPlugin")
-
 namespace gz::sim::systems
 {
 
@@ -55,6 +47,13 @@ SprayPaintPlugin::SprayPaintPlugin() = default;
 
 // Logging helpers
 
+/**
+ * @brief Returns the current wall-clock time as a formatted string.
+ *
+ * Format: HH:MM:SS.mmm - used as a prefix in log lines produced by Log().
+ *
+ * @return Formatted timestamp string.
+ */
 std::string SprayPaintPlugin::Timestamp() const
 {
   using namespace std::chrono;
@@ -68,6 +67,16 @@ std::string SprayPaintPlugin::Timestamp() const
   return ts.str();
 }
 
+/**
+ * @brief Emits a structured log line to the Gazebo message stream.
+ *
+ * Each line is formatted as:
+ *   [HH:MM:SS.mmm] [LEVEL  ] [step          ] message
+ *
+ * @param level  Severity label (e.g. "INFO", "WARN").
+ * @param step   Short tag identifying the plugin stage (e.g. "Configure").
+ * @param msg    Human-readable message body.
+ */
 void SprayPaintPlugin::Log(const std::string &level,
                            const std::string &step,
                            const std::string &msg)
@@ -82,11 +91,25 @@ void SprayPaintPlugin::Log(const std::string &level,
   gzmsg << out;
 }
 
+/**
+ * @brief Convenience overload that logs at INFO level.
+ *
+ * @param step  Short tag identifying the plugin stage.
+ * @param msg   Human-readable message body.
+ */
 void SprayPaintPlugin::Log(const std::string &step, const std::string &msg)
 {
   Log("INFO", step, msg);
 }
 
+/**
+ * @brief Emits a visual section header to the Gazebo message stream.
+ *
+ * Prints a 60-character '=' bar above and below the title, making it easy
+ * to find major lifecycle transitions in a scrolling log.
+ *
+ * @param title  Label to display between the separator bars.
+ */
 void SprayPaintPlugin::LogSection(const std::string &title)
 {
   const std::string bar(60, '=');
@@ -96,6 +119,18 @@ void SprayPaintPlugin::LogSection(const std::string &title)
 
 // MakePatch
 
+/**
+ * @brief Constructs a PaintPatch descriptor for a single raycast hit.
+ *
+ * The patch is a thin disc whose radius matches the cone footprint at the
+ * hit distance.  The disc is offset slightly along the surface normal so it
+ * sits proud of the geometry and avoids z-fighting.
+ *
+ * @param _hitWorld    Hit point in world coordinates.
+ * @param _normalWorld Outward surface normal at the hit point (world frame).
+ * @param _dist        Distance from the nozzle origin to the hit point (m).
+ * @return             A PaintPatch with worldPose, size, and valid=true set.
+ */
 SprayPaintPlugin::PaintPatch SprayPaintPlugin::MakePatch(
     const gz::math::Vector3d &_hitWorld,
     const gz::math::Vector3d &_normalWorld,
@@ -133,6 +168,16 @@ SprayPaintPlugin::PaintPatch SprayPaintPlugin::MakePatch(
 
 // GenerateConeRays
 
+/**
+ * @brief Generates ray origin-endpoint pairs spanning the spray cone.
+ *
+ * Rays are expressed in nozzle-local frame (+X is the spray axis).  The
+ * first ray is always the centre axis.  Remaining rays are distributed
+ * across the cone solid angle using Fibonacci/sunflower disk sampling,
+ * which produces uniform coverage with no grid bias.
+ *
+ * @return Vector of (origin, endpoint) pairs, each in nozzle-local frame.
+ */
 std::vector<std::pair<gz::math::Vector3d, gz::math::Vector3d>>
 SprayPaintPlugin::GenerateConeRays() const
 {
@@ -164,6 +209,20 @@ SprayPaintPlugin::GenerateConeRays() const
 
 // FindHitLink
 
+/**
+ * @brief Finds the nearest non-robot link to a world-space hit point.
+ *
+ * Uses a two-pass search:
+ *  1. Collision entity centres (accurate for multi-link / offset models).
+ *  2. Link entity origins as a fallback for geometry types (e.g. PLANE)
+ *     whose Collision components are absent from the ECM.
+ *
+ * Links belonging to the robot's own model are excluded via ownLinks_.
+ *
+ * @param hitWorld  Hit point in world coordinates.
+ * @param _ecm      Reference to the Entity Component Manager.
+ * @return          Entity ID of the nearest paintable link, or kNullEntity.
+ */
 gz::sim::Entity SprayPaintPlugin::FindHitLink(
     const gz::math::Vector3d &hitWorld,
     EntityComponentManager &_ecm) const
@@ -220,6 +279,18 @@ gz::sim::Entity SprayPaintPlugin::FindHitLink(
 
 // Configure
 
+/**
+ * @brief ISystemConfigure callback - reads SDF parameters and subscribes to
+ *        the spray trigger topic.
+ *
+ * Called once by Gazebo when the plugin is loaded.  All SDF parameters are
+ * optional; missing elements keep their default-initialised values.
+ *
+ * @param _entity   Entity this plugin is attached to (unused).
+ * @param _sdf      SDF element containing plugin parameters.
+ * @param _ecm      Entity Component Manager (unused at configure time).
+ * @param _eventMgr Event Manager - cached for use in PreUpdate.
+ */
 void SprayPaintPlugin::Configure(
     const Entity & /*_entity*/,
     const std::shared_ptr<const sdf::Element> &_sdf,
@@ -284,6 +355,15 @@ void SprayPaintPlugin::Configure(
 
 // OnSprayMsg
 
+/**
+ * @brief Transport callback fired when a message arrives on the spray topic.
+ *
+ * Atomically updates sprayActive_ and logs the state transition.  Resets
+ * the one-shot diagnostic flag so the next spray-ON edge re-dumps nozzle
+ * state.
+ *
+ * @param _msg  Boolean message: true = spray ON, false = spray OFF.
+ */
 void SprayPaintPlugin::OnSprayMsg(const gz::msgs::Boolean &_msg)
 {
   const bool newState = _msg.data();
@@ -303,6 +383,20 @@ void SprayPaintPlugin::OnSprayMsg(const gz::msgs::Boolean &_msg)
 
 // PreUpdate
 
+/**
+ * @brief ISystemPreUpdate callback - core per-step logic.
+ *
+ * Executed every simulation step before physics.  Responsibilities:
+ *  - Resolve the nozzle link entity on first appearance (STEP 2).
+ *  - Manage the particle emitter lifecycle: create, reposition, remove
+ *    (STEP 3 / 3b / 3c) - gated by enableParticleEmitter_.
+ *  - Rate-limit ray scans to every paintIntervalSteps_ steps (STEP 6).
+ *  - Read RaycastData results and deposit PaintPatch visuals on hit
+ *    surfaces, with per-link deduplication (STEP 7-9).
+ *
+ * @param _info  Simulation update info (timestep, paused state, etc.).
+ * @param _ecm   Entity Component Manager for querying and creating entities.
+ */
 void SprayPaintPlugin::PreUpdate(
     const UpdateInfo & /*_info*/,
     EntityComponentManager &_ecm)
@@ -472,7 +566,7 @@ void SprayPaintPlugin::PreUpdate(
       emitterSdf.SetScaleRate(scaleRate);
       emitterSdf.SetSize(gz::math::Vector3d(0.005, 0.005, 0.005));
 
-      // Local pose zero relative to nozzle — SetParent keeps it as-is (LOCAL).
+      // Local pose zero relative to nozzle - SetParent keeps it as-is (LOCAL).
       // STEP 3c re-asserts zero every PreUpdate so any SetParent-induced drift
       // on 2nd+ activations is corrected before PostUpdate renders it.
       emitterSdf.SetRawPose(gz::math::Pose3d(0, 0, 0, 0, 0, 0));
@@ -502,7 +596,7 @@ void SprayPaintPlugin::PreUpdate(
     }
   }  // enableParticleEmitter_
 
-  // STEP 4: Guard – do nothing if spray not active
+  // STEP 4: Guard : do nothing if spray not active
   if (!sprayActive_)
     return;
 
@@ -568,7 +662,7 @@ void SprayPaintPlugin::PreUpdate(
     // Find the link whose collision shape is nearest to the hit point.
     const Entity patchParent = FindHitLink(hitWorld, _ecm);
     if (patchParent == kNullEntity)
-      continue;  // no paintable surface found — skip silently
+      continue;  // no paintable surface found - skip silently
 
     const PaintPatch patch = MakePatch(hitWorld, normWorld, dist);
     if (!patch.valid) continue;
@@ -629,3 +723,11 @@ void SprayPaintPlugin::PreUpdate(
 }
 
 }  // namespace gz::sim::systems
+
+GZ_ADD_PLUGIN(gz::sim::systems::SprayPaintPlugin,
+              gz::sim::System,
+              gz::sim::systems::SprayPaintPlugin::ISystemConfigure,
+              gz::sim::systems::SprayPaintPlugin::ISystemPreUpdate)
+
+GZ_ADD_PLUGIN_ALIAS(gz::sim::systems::SprayPaintPlugin,
+                    "gz::sim::systems::SprayPaintPlugin")

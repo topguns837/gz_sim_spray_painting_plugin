@@ -19,9 +19,8 @@
 <h3 align="center">Gz Sim Spray Painting Plugin</h3>
 
   <p align="center">
-    A Gazebo Harmonic (gz-sim 8) system plugin that simulates spray paint application
-    via physics ray-casting. Generates realistic cone coverage with paint patches on
-    any surface geometry and a particle cloud visual effect.
+    A Gazebo plugin for simulating spray painting. Attach it to any robot link and
+    visualise paint coverage in your Gazebo simulation.
     <br />    ·
     <a href="https://github.com/topguns837/gz_sim_spray_painting_plugin/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     ·
@@ -69,13 +68,11 @@
 
 <br>
 
-The **GZ Sim Spray Painting Plugin** (`libSprayPaintPlugin.so`) is a Gazebo Harmonic
-system plugin that can be used to simulate spray painting.
+While working on a project involving spray painting using a robotic manipulator,
+I came across a gap in Gazebo - there is no built-in way to mimic a spray painting
+application. This plugin is built to fill that gap.
 
-This plugin turns any simulated link into a spray gun nozzle. It fires a
-configurable ray-casting cone each simulation step and deposits thin disc paint patches
-wherever rays intersect geometry. A dynamic particle emitter provides the visual spray
-cloud and follows the nozzle in real time.
+Contributions from the open-source community are welcome!
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -180,8 +177,9 @@ Switch to the spray control window with:
 The window has two panes : Top pane sends **Spray ON**, bottom pane sends **Spray OFF**.
 Press **Enter** in the relevant pane to toggle spray painting.
 
-The topic name is configurable via the `<spray_topic>` SDF parameter (defined in
-[`src/gz_sim_spray_painting_plugin/include/gz_sim_spray_painting_plugin/SprayPaintPlugin.hh`](src/gz_sim_spray_painting_plugin/include/gz_sim_spray_painting_plugin/SprayPaintPlugin.hh)).
+The topic name is configurable via the `<spray_topic>` SDF parameter - see
+[`src/gz_spray_painting_plugin_demo/urdf/spray_nozzle.urdf`](src/gz_spray_painting_plugin_demo/urdf/spray_nozzle.urdf)
+for an example.
 
 ---
 
@@ -243,7 +241,7 @@ export GZ_SIM_SYSTEM_PLUGIN_PATH=/path/to/install/gz_sim_spray_painting_plugin/l
 <!-- LICENSE -->
 ## License
 
-Distributed under the Apache-2.0 License. See [`LICENSE.txt`](LICENSE.txt) for more information.
+Distributed under the Apache-2.0 License. See [`LICENSE`](LICENSE) for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -254,7 +252,6 @@ Distributed under the Apache-2.0 License. See [`LICENSE.txt`](LICENSE.txt) for m
 
 Arjun Kharidas - kharjun4@gmail.com
 
-Project Link: [https://github.com/topguns837/gz_sim_spray_painting_plugin](https://github.com/topguns837/gz_sim_spray_painting_plugin)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
