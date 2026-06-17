@@ -65,10 +65,14 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Screenshot][product-screenshot]](https://github.com/topguns837/gz_sim_spray_painting_plugin)
+<img src="resources/spray_painting_car_demo.gif" alt="Demo" width="800"/>
+
+<br>
 
 The **GZ Sim Spray Painting Plugin** (`libSprayPaintPlugin.so`) is a Gazebo Harmonic
-system plugin that turns any simulated link into a spray gun nozzle. It fires a
+system plugin that can be used to simulate spray painting.
+
+This plugin turns any simulated link into a spray gun nozzle. It fires a
 configurable ray-casting cone each simulation step and deposits thin disc paint patches
 wherever rays intersect geometry. A dynamic particle emitter provides the visual spray
 cloud and follows the nozzle in real time.
