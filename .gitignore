@@ -6,7 +6,7 @@ log/
 # ── Plugin file logs ──────────────────────────────────────────────────────────
 file_logs/
 
-# ── Cloned dependencies (managed via src/*.repos files — not owned source) ───
+# ── Cloned dependencies (managed via src/*.repos files, not owned source) ───
 src/gz_ros2_control/
 
 # ── Claude Code local settings (user-specific permissions) ───────────────────

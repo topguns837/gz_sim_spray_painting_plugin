@@ -8,11 +8,6 @@
 # Run (headless, trigger via gz topic):
 #   docker run --rm -it spray_paint_plugin gz sim -s $SPRAY_WORLD
 #
-# Run with GUI (requires X11 forwarding on host: xhost +local:docker):
-#   docker run --rm -it \
-#     -e DISPLAY=$DISPLAY \
-#     -v /tmp/.X11-unix:/tmp/.X11-unix \
-#     spray_paint_plugin gz sim $SPRAY_WORLD
 # ─────────────────────────────────────────────────────────────────────────────
 
 FROM ubuntu:22.04

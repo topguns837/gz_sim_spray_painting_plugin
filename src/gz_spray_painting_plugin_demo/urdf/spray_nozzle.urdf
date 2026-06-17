@@ -71,6 +71,7 @@
       <num_rays>16</num_rays>
       <patch_spacing>0.02</patch_spacing>
       <paint_interval_steps>10</paint_interval_steps>
+      <enable_particle_emitter>true</enable_particle_emitter>
     </plugin>
   </gazebo>
 

@@ -1,6 +1,6 @@
 version: "3.9"
 
-# ─── Spray Paint Plugin – Docker Compose ──────────────────────────────────────
+# Spray Paint Plugin – Docker Compose
 #
 # Usage:
 #   Build image:
@@ -14,7 +14,6 @@ version: "3.9"
 #
 #   Open an interactive shell:
 #     docker compose -f docker/docker-compose.yml run --rm shell
-# ──────────────────────────────────────────────────────────────────────────────
 
 x-common: &common
   image: spray_paint_plugin
@@ -28,7 +27,7 @@ x-common: &common
 
 services:
 
-  # ── Headless server (no GUI, use gz topic to trigger spray) ────────────────
+  # Headless server (no GUI, use gz topic to trigger spray)
   spray-headless:
     <<: *common
     command: >
@@ -36,7 +35,7 @@ services:
       /ws/install/gz_sim_spray_painting_plugin/share/gz_sim_spray_painting_plugin/worlds/spray_painting.sdf
     network_mode: host
 
-  # ── GUI (requires X11 forwarding on host) ──────────────────────────────────
+  # GUI (requires X11 forwarding on host)
   # Run on host first: xhost +local:docker
   spray-gui:
     <<: *common
@@ -52,7 +51,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
     network_mode: host
 
-  # ── Interactive shell ───────────────────────────────────────────────────────
+  # Interactive shell
   shell:
     <<: *common
     command: bash

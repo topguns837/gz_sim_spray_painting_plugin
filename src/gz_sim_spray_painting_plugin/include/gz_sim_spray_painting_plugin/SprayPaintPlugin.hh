@@ -3,8 +3,6 @@
 #include <atomic>
 #include <chrono>
 #include <ctime>
-#include <filesystem>
-#include <fstream>
 #include <iomanip>
 #include <mutex>
 #include <string>
@@ -61,7 +59,7 @@ public:
 private:
   void OnSprayMsg(const gz::msgs::Boolean &_msg);
 
-  // ── Config ────────────────────────────────────────────────────────────────
+  // Config
   std::string     nozzleLink_{"nozzle_link"};
   double          coneHalfAngle_{0.2618};    // 15° in radians
   double          coneMaxRange_{3.0};
@@ -72,8 +70,9 @@ private:
   double   patchSpacing_{0.02};       // min patch centre gap in m (SDF: <patch_spacing>)
   uint32_t paintIntervalSteps_{10};   // paint scan every N steps (SDF: <paint_interval_steps>)
   int      numRays_{16};              // cone rays per scan (SDF: <num_rays>)
+  bool     enableParticleEmitter_{true}; // SDF: <enable_particle_emitter>
 
-  // ── Runtime ───────────────────────────────────────────────────────────────
+  // Runtime
   std::atomic<bool>      sprayActive_{false};
   gz::transport::Node    transportNode_;
   gz::sim::Entity        nozzleEntity_{gz::sim::kNullEntity};
@@ -98,7 +97,7 @@ private:
   std::unordered_map<gz::sim::Entity,
                      std::vector<gz::math::Vector3d>> patchCenters_;
 
-  // ── Patch geometry ────────────────────────────────────────────────────────
+  // Patch geometry
 
   struct PaintPatch
   {
@@ -123,9 +122,7 @@ private:
       const gz::math::Vector3d &hitWorld,
       EntityComponentManager &_ecm) const;
 
-  // ── Debug logging ─────────────────────────────────────────────────────────
-  std::ofstream logFile_;
-  std::string   logPath_;
+  // Debug logging
   bool          debugDumped_{false};
 
   std::string Timestamp() const;
